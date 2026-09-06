@@ -445,4 +445,193 @@ class AnaliseCreditoTest extends TestCase
 
         Http::assertNothingSent();
     }
+public function test_score_399_reprova_credito(): void
+{
+    Http::fake([
+        '*' => Http::response([
+            'cpf' => '12345678999',
+            'score' => 399,
+        ], 200),
+    ]);
+
+    $response = $this->postJson('/api/analise-credito', [
+        'nome' => 'Cliente Score 399',
+        'cpf' => '12345678999',
+        'renda_mensal' => 10000,
+        'tipo_credito' => 'pessoal',
+        'valor_solicitado' => 5000,
+    ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonPath('status', 'reprovado')
+        ->assertJsonPath('score', 399)
+        ->assertJsonPath(
+            'motivo_rejeicao',
+            'Score de crédito muito baixo'
+        );
+}
+
+
+public function test_score_400_aprova_com_taxa_de_4_5_porcento(): void
+{
+    Http::fake([
+        '*' => Http::response([
+            'cpf' => '12345678998',
+            'score' => 400,
+        ], 200),
+    ]);
+
+    $response = $this->postJson('/api/analise-credito', [
+        'nome' => 'Cliente Score 400',
+        'cpf' => '12345678998',
+        'renda_mensal' => 10000,
+        'tipo_credito' => 'pessoal',
+        'valor_solicitado' => 5000,
+    ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonPath('status', 'aprovado')
+        ->assertJsonPath('score', 400)
+        ->assertJsonPath('taxa_juros', '4.50');
+}
+
+
+public function test_score_699_aprova_com_taxa_de_4_5_porcento(): void
+{
+    Http::fake([
+        '*' => Http::response([
+            'cpf' => '12345678997',
+            'score' => 699,
+        ], 200),
+    ]);
+
+    $response = $this->postJson('/api/analise-credito', [
+        'nome' => 'Cliente Score 699',
+        'cpf' => '12345678997',
+        'renda_mensal' => 10000,
+        'tipo_credito' => 'pessoal',
+        'valor_solicitado' => 5000,
+    ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonPath('status', 'aprovado')
+        ->assertJsonPath('score', 699)
+        ->assertJsonPath('taxa_juros', '4.50');
+}
+
+
+public function test_score_700_aprova_com_taxa_de_2_9_porcento(): void
+{
+    Http::fake([
+        '*' => Http::response([
+            'cpf' => '12345678996',
+            'score' => 700,
+        ], 200),
+    ]);
+
+    $response = $this->postJson('/api/analise-credito', [
+        'nome' => 'Cliente Score 700',
+        'cpf' => '12345678996',
+        'renda_mensal' => 10000,
+        'tipo_credito' => 'pessoal',
+        'valor_solicitado' => 5000,
+    ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonPath('status', 'aprovado')
+        ->assertJsonPath('score', 700)
+        ->assertJsonPath('taxa_juros', '2.90');
+}
+
+
+public function test_renda_de_1499_99_reprova_credito(): void
+{
+    Http::fake([
+        '*' => Http::response([
+            'cpf' => '12345678995',
+            'score' => 850,
+        ], 200),
+    ]);
+
+    $response = $this->postJson('/api/analise-credito', [
+        'nome' => 'Cliente Renda 1499',
+        'cpf' => '12345678995',
+        'renda_mensal' => 1499.99,
+        'tipo_credito' => 'pessoal',
+        'valor_solicitado' => 1000,
+    ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonPath('status', 'reprovado')
+        ->assertJsonPath(
+            'motivo_rejeicao',
+            'Renda mínima insuficiente'
+        );
+}
+
+
+public function test_renda_exatamente_1500_nao_reprova_por_renda_minima(): void
+{
+    Http::fake([
+        '*' => Http::response([
+            'cpf' => '12345678994',
+            'score' => 850,
+        ], 200),
+    ]);
+
+    $response = $this->postJson('/api/analise-credito', [
+        'nome' => 'Cliente Renda 1500',
+        'cpf' => '12345678994',
+        'renda_mensal' => 1500,
+        'tipo_credito' => 'pessoal',
+        'valor_solicitado' => 1000,
+    ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonPath('status', 'aprovado')
+        ->assertJsonPath('taxa_juros', '2.90');
+}
+
+
+public function test_parcela_exatamente_30_porcento_da_renda_e_permitida(): void
+{
+    Http::fake([
+        '*' => Http::response([
+            'cpf' => '12345678993',
+            'score' => 850,
+        ], 200),
+    ]);
+
+    /*
+     * Com score 850:
+     *
+     * taxa = 2,9%
+     * valor = 26.706,23
+     * parcela calculada = 3.000,00
+     *
+     * renda = 10.000,00
+     * 30% da renda = 3.000,00
+     *
+     * A regra reprova somente quando parcela > 30%.
+     */
+    $response = $this->postJson('/api/analise-credito', [
+        'nome' => 'Cliente Limite 30',
+        'cpf' => '12345678993',
+        'renda_mensal' => 10000,
+        'tipo_credito' => 'pessoal',
+        'valor_solicitado' => 26706.23,
+    ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonPath('status', 'aprovado')
+        ->assertJsonPath('valor_parcela', '3000.00');
+}
+
 }
