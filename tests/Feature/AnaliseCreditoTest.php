@@ -346,4 +346,103 @@ class AnaliseCreditoTest extends TestCase
             'status' => 'reprovado',
         ]);
     }
+
+    public function test_falha_de_conexao_com_bureau_retorna_504_sem_crash(): void
+    {
+        Http::fake([
+            '*' => Http::failedConnection(
+                'Timeout ao consultar o Bureau'
+            ),
+        ]);
+
+        $response = $this->postJson('/api/analise-credito', [
+            'nome' => 'Cliente Timeout',
+            'cpf' => '12345678905',
+            'renda_mensal' => 10000,
+            'tipo_credito' => 'pessoal',
+            'valor_solicitado' => 5000,
+        ]);
+
+        $response
+            ->assertStatus(504)
+            ->assertJson([
+                'message' => 'Tempo limite ou falha de comunicação com o Bureau de Crédito.',
+            ]);
+
+        $this->assertDatabaseHas('analises_credito', [
+            'cpf' => '12345678905',
+            'status' => 'pendente',
+        ]);
+    }
+
+    public function test_retorna_404_ao_contratar_analise_inexistente(): void
+    {
+        $response = $this->postJson(
+            '/api/analise-credito/999999/contratar'
+        );
+
+        $response->assertNotFound();
+    }
+
+    public function test_cliente_existente_e_reutilizado_em_nova_analise(): void
+    {
+        $cliente = Cliente::create([
+            'nome' => 'Cliente Existente',
+            'cpf' => '12345678903',
+            'email' => 'existente@example.com',
+            'telefone' => null,
+            'renda_mensal' => 10000,
+        ]);
+
+        Http::fake([
+            '*' => Http::response([
+                'cpf' => '12345678903',
+                'score' => 850,
+            ], 200),
+        ]);
+
+        $response = $this->postJson('/api/analise-credito', [
+            'nome' => 'Cliente Existente',
+            'cpf' => '12345678903',
+            'renda_mensal' => 10000,
+            'tipo_credito' => 'pessoal',
+            'valor_solicitado' => 5000,
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('cliente_id', $cliente->id);
+
+        $this->assertSame(
+            1,
+            Cliente::where('cpf', '12345678903')->count()
+        );
+
+        $this->assertDatabaseHas('analises_credito', [
+            'cliente_id' => $cliente->id,
+            'cpf' => '12345678903',
+        ]);
+    }
+
+    public function test_valida_dados_obrigatorios_da_solicitacao_de_analise(): void
+    {
+        Http::fake();
+
+        $response = $this->postJson(
+            '/api/analise-credito',
+            []
+        );
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonValidationErrors([
+                'nome',
+                'cpf',
+                'renda_mensal',
+                'tipo_credito',
+                'valor_solicitado',
+            ]);
+
+        Http::assertNothingSent();
+    }
 }

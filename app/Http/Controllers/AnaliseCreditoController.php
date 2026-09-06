@@ -14,8 +14,7 @@ class AnaliseCreditoController extends Controller
 {
     public function __construct(
         private readonly AnaliseCreditoService $analiseCreditoService
-    ) {
-    }
+    ) {}
 
     /**
      * Solicita uma nova análise de crédito.

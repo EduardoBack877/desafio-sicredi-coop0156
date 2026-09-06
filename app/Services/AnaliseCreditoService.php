@@ -9,19 +9,22 @@ use App\Models\Cliente;
 class AnaliseCreditoService
 {
     private const RENDA_MINIMA = 1500.00;
+
     private const SCORE_MINIMO = 400;
+
     private const SCORE_ALTO = 700;
 
     private const TAXA_SCORE_MEDIO = 4.5;
+
     private const TAXA_SCORE_ALTO = 2.9;
 
     private const QUANTIDADE_PARCELAS = 12;
+
     private const LIMITE_COMPROMETIMENTO_RENDA = 0.30;
 
     public function __construct(
         private readonly BureauService $bureauService
-    ) {
-    }
+    ) {}
 
     /**
      * Executa o fluxo completo de uma análise de crédito.
@@ -172,23 +175,24 @@ class AnaliseCreditoService
 
         return $analise->fresh();
     }
+
     /**
- * Confirma a contratação de uma análise aprovada.
- */
-public function contratar(int $id): AnaliseCredito
-{
-    $analise = AnaliseCredito::findOrFail($id);
+     * Confirma a contratação de uma análise aprovada.
+     */
+    public function contratar(int $id): AnaliseCredito
+    {
+        $analise = AnaliseCredito::findOrFail($id);
 
-    if ($analise->status !== StatusAnalise::APROVADO) {
-        throw new \DomainException(
-            'A análise de crédito não está aprovada para contratação.'
-        );
+        if ($analise->status !== StatusAnalise::APROVADO) {
+            throw new \DomainException(
+                'A análise de crédito não está aprovada para contratação.'
+            );
+        }
+
+        $analise->update([
+            'status' => StatusAnalise::CONTRATADO,
+        ]);
+
+        return $analise->fresh();
     }
-
-    $analise->update([
-        'status' => StatusAnalise::CONTRATADO,
-    ]);
-
-    return $analise->fresh();
-}
 }
